@@ -350,7 +350,7 @@ open class ItemListControllerNode: ASDisplayNode {
             }
         }
         
-        self.listNode.visibleContentOffsetChanged = { [weak self] offset in
+        self.listNode.visibleContentOffsetChanged = { [weak self] offset, _ in
             var inVoiceOver = false
             if let validLayout = self?.validLayout {
                 inVoiceOver = validLayout.0.inVoiceOver

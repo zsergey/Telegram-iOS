@@ -960,19 +960,18 @@ private final class ContextControllerNode: ViewControllerTracingNode, UIScrollVi
                 extracted.willUpdateIsExtractedToContextPreview?(true, .animated(duration: 0.2, curve: .easeInOut))
             case .controller:
                 let springDuration: Double = 0.52 * animationDurationFactor
-                let springDamping: CGFloat = 110.0
+                let springDamping: CGFloat = 104.0
                 
                 self.actionsContainerNode.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2 * animationDurationFactor)
                 self.actionsContainerNode.layer.animateSpring(from: 0.1 as NSNumber, to: 1.0 as NSNumber, keyPath: "transform.scale", duration: springDuration, initialVelocity: 0.0, damping: springDamping)
                 self.contentContainerNode.allowsGroupOpacity = true
+                
                 self.contentContainerNode.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2 * animationDurationFactor, completion: { [weak self] _ in
                     self?.contentContainerNode.allowsGroupOpacity = false
                 })
                 
                 if let originalProjectedContentViewFrame = self.originalProjectedContentViewFrame {
                     let localSourceFrame = self.view.convert(CGRect(origin: CGPoint(x: originalProjectedContentViewFrame.1.minX, y: originalProjectedContentViewFrame.1.minY), size: CGSize(width: originalProjectedContentViewFrame.1.width, height: originalProjectedContentViewFrame.1.height)), to: self.scrollNode.view)
-                    
-                    self.contentContainerNode.layer.animateSpring(from: min(localSourceFrame.width / self.contentContainerNode.frame.width, localSourceFrame.height / self.contentContainerNode.frame.height) as NSNumber, to: 1.0 as NSNumber, keyPath: "transform.scale", duration: springDuration, initialVelocity: 0.0, damping: springDamping)
                     
                     switch self.source {
                     case let .controller(controller):
@@ -982,8 +981,15 @@ private final class ContextControllerNode: ViewControllerTracingNode, UIScrollVi
                     }
                     
                     let contentContainerOffset = CGPoint(x: localSourceFrame.center.x - self.contentContainerNode.frame.center.x, y: localSourceFrame.center.y - self.contentContainerNode.frame.center.y)
+                    
                     if let contentNode = self.contentContainerNode.contentNode, case let .controller(controller) = contentNode {
-                        let snapshotView: UIView? = nil// controller.sourceNode.view.snapshotContentTree()
+                        
+                        /// TODO, Sergey: How to find pinned state?
+                        let isPinned = false
+                        controller.sourceView.backgroundColor = isPinned ? presentationData.theme.chatList.pinnedItemBackgroundColor : presentationData.theme.chatList.itemBackgroundColor
+                        
+                        
+                        let snapshotView: UIView? = controller.sourceView.snapshotContentTree()
                         if let snapshotView = snapshotView {
                             controller.sourceView.isHidden = true
                             
@@ -995,7 +1001,14 @@ private final class ContextControllerNode: ViewControllerTracingNode, UIScrollVi
                             })
                         }
                     }
-                    self.actionsContainerNode.layer.animateSpring(from: NSValue(cgPoint: CGPoint(x: localSourceFrame.center.x - self.actionsContainerNode.position.x, y: localSourceFrame.center.y - self.actionsContainerNode.position.y)), to: NSValue(cgPoint: CGPoint()), keyPath: "position", duration: springDuration, initialVelocity: 0.0, damping: springDamping, additive: true)
+
+                    let toBounds = contentContainerNode.bounds
+                    let fromBounds = CGRect(origin: CGPoint(), size: localSourceFrame.size)
+                    self.contentContainerNode.layer.animateSpring(from: NSValue(cgRect: fromBounds), to: NSValue(cgRect: toBounds), keyPath: "bounds", duration: springDuration, initialVelocity: 0.0, damping: springDamping, removeOnCompletion: false)
+
+                    let fromY = localSourceFrame.center.y - self.actionsContainerNode.position.y
+                    self.actionsContainerNode.layer.animateSpring(from: NSValue(cgPoint: CGPoint(x: -self.actionsContainerNode.position.x, y: fromY)), to: NSValue(cgPoint: CGPoint()), keyPath: "position", duration: springDuration, initialVelocity: 0.0, damping: springDamping, additive: true)
+
                     self.contentContainerNode.layer.animateSpring(from: NSValue(cgPoint: contentContainerOffset), to: NSValue(cgPoint: CGPoint()), keyPath: "position", duration: springDuration, initialVelocity: 0.0, damping: springDamping, additive: true, completion: { [weak self] _ in
                         self?.animatedIn = true
                     })
@@ -1315,6 +1328,9 @@ private final class ContextControllerNode: ViewControllerTracingNode, UIScrollVi
                 contentParentNode.willUpdateIsExtractedToContextPreview?(false, .animated(duration: 0.2, curve: .easeInOut))
             }
         case let .controller(source):
+            let springDuration: Double = 0.52 * animationDurationFactor
+            let springDamping: CGFloat = 104.0
+
             guard let maybeContentNode = self.contentContainerNode.contentNode, case let .controller(controller) = maybeContentNode else {
                 return
             }
@@ -1346,8 +1362,10 @@ private final class ContextControllerNode: ViewControllerTracingNode, UIScrollVi
             var completedEffect = false
             var completedContentNode = false
             var completedActionsNode = false
+            var targetView: UIView?
             
             if let transitionInfo = transitionInfo, let (sourceView, sourceNodeRect) = transitionInfo.sourceNode() {
+                targetView = sourceView
                 let projectedFrame = convertFrame(sourceNodeRect, from: sourceView, to: self.view)
                 self.originalProjectedContentViewFrame = (projectedFrame, projectedFrame)
                 
@@ -1414,7 +1432,6 @@ private final class ContextControllerNode: ViewControllerTracingNode, UIScrollVi
             self.contentContainerNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.2 * animationDurationFactor, removeOnCompletion: false, completion: { _ in
             })
             self.actionsContainerNode.layer.animateScale(from: 1.0, to: 0.1, duration: transitionDuration * animationDurationFactor, timingFunction: transitionCurve.timingFunction, removeOnCompletion: false)
-            self.contentContainerNode.layer.animateScale(from: 1.0, to: 0.01, duration: transitionDuration * animationDurationFactor, timingFunction: transitionCurve.timingFunction, removeOnCompletion: false)
             
             let animateOutToItem: Bool
             switch result {
@@ -1424,18 +1441,43 @@ private final class ContextControllerNode: ViewControllerTracingNode, UIScrollVi
                 animateOutToItem = false
             }
             
-            if animateOutToItem, let originalProjectedContentViewFrame = self.originalProjectedContentViewFrame {
+            if animateOutToItem, let targetView = targetView, let originalProjectedContentViewFrame = self.originalProjectedContentViewFrame {
                 let localSourceFrame = self.view.convert(CGRect(origin: CGPoint(x: originalProjectedContentViewFrame.1.minX, y: originalProjectedContentViewFrame.1.minY), size: CGSize(width: originalProjectedContentViewFrame.1.width, height: originalProjectedContentViewFrame.1.height)), to: self.scrollNode.view)
                 
+                /// TODO, Sergey: How to resolve color? It dosen't work.
+                targetView.backgroundColor = presentationData.theme.chatList.itemBackgroundColor
+                if let traitCollection = UIApplication.shared.keyWindow?.traitCollection {
+                    if #available(iOS 13.0, *) {
+                        targetView.backgroundColor = presentationData.theme.chatList.itemBackgroundColor.resolvedColor(with: traitCollection)
+                    }
+                }
+                
+                if let snapshotView = targetView.snapshotContentTree(unhide: true, keepTransform: true) {
+
+                    self.view.addSubview(snapshotView)
+                    
+                    snapshotView.layer.animateSpring(from: NSValue(cgPoint: CGPoint(x: self.contentContainerNode.frame.midX, y: self.contentContainerNode.frame.minY + localSourceFrame.height / 2.0)), to: NSValue(cgPoint: localSourceFrame.center), keyPath: "position", duration: springDuration, initialVelocity: 0.0, damping: springDamping, removeOnCompletion: false) { [weak snapshotView] _ in
+                        snapshotView?.removeFromSuperview()
+                    }
+
+                    snapshotView.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2 * animationDurationFactor, removeOnCompletion: false)
+                }
+                
                 self.actionsContainerNode.layer.animatePosition(from: CGPoint(), to: CGPoint(x: localSourceFrame.center.x - self.actionsContainerNode.position.x, y: localSourceFrame.center.y - self.actionsContainerNode.position.y), duration: transitionDuration * animationDurationFactor, timingFunction: transitionCurve.timingFunction, removeOnCompletion: false, additive: true)
-                let contentContainerOffset = CGPoint(x: localSourceFrame.center.x - self.contentContainerNode.frame.center.x, y: localSourceFrame.center.y - self.contentContainerNode.frame.center.y)
-                self.contentContainerNode.layer.animatePosition(from: CGPoint(), to: contentContainerOffset, duration: transitionDuration * animationDurationFactor, timingFunction: transitionCurve.timingFunction, removeOnCompletion: false, additive: true, completion: { [weak self] _ in
+
+                let fromBounds = contentContainerNode.bounds
+                let toBounds = CGRect(origin: .zero, size: localSourceFrame.size)
+                self.contentContainerNode.layer.animateSpring(from: NSValue(cgRect: fromBounds), to: NSValue(cgRect: toBounds), keyPath: "bounds", duration: springDuration, initialVelocity: 0.0, damping: springDamping, removeOnCompletion: false) { [weak self] _ in
                     completedContentNode = true
                     if let strongSelf = self, let contentNode = strongSelf.contentContainerNode.contentNode, case let .controller(controller) = contentNode {
                         controller.sourceView.isHidden = false
+                        controller.sourceView.backgroundColor = .clear
                     }
                     intermediateCompletion()
-                })
+                }
+                
+                self.contentContainerNode.layer.animatePosition(from: self.contentContainerNode.position, to: localSourceFrame.center, duration: transitionDuration * animationDurationFactor, timingFunction: transitionCurve.timingFunction, removeOnCompletion: false)
+
             } else {
                 if let contentNode = self.contentContainerNode.contentNode, case let .controller(controller) = contentNode {
                     controller.sourceView.isHidden = false

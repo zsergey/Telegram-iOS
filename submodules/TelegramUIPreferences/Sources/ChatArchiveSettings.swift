@@ -7,7 +7,7 @@ public struct ChatArchiveSettings: Equatable, Codable {
     public var hiddenPsaPeerId: EnginePeer.Id?
     
     public static var `default`: ChatArchiveSettings {
-        return ChatArchiveSettings(isHiddenByDefault: false, hiddenPsaPeerId: nil)
+        return ChatArchiveSettings(isHiddenByDefault: true, hiddenPsaPeerId: nil)
     }
     
     public init(isHiddenByDefault: Bool, hiddenPsaPeerId: EnginePeer.Id?) {

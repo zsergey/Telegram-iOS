@@ -210,7 +210,9 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
     private var sharedOpenStoryProgressDisposable = MetaDisposable()
     
     private var fullScreenEffectView: RippleEffectView?
-    
+
+    private weak var currentContextController: ContextController?
+
     public override func updateNavigationCustomData(_ data: Any?, progress: CGFloat, transition: ContainedViewLayoutTransition) {
         if self.isNodeLoaded {
             self.chatListDisplayNode.effectiveContainerNode.updateSelectedChatLocation(data: data as? ChatLocation, progress: progress, transition: transition)
@@ -917,6 +919,8 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
             self.chatListDisplayNode.updatePresentationData(self.presentationData)
         }
         
+        self.currentContextController?.updateTheme(presentationData: self.presentationData)
+        
         self.requestLayout(transition: .immediate)
     }
     
@@ -1030,7 +1034,9 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                             chatLocation = .peer(peer)
                             
                             strongSelf.context.sharedContext.navigateToChatController(NavigateToChatControllerParams(navigationController: navigationController, context: strongSelf.context, chatLocation: chatLocation, activateInput: (activateInput && !peer.isDeleted) ? .text : nil, scrollToEndIfExists: scrollToEndIfExists, animated: !scrollToEndIfExists, options: navigationAnimationOptions, parentGroupId: groupId._asGroup(), chatListFilter: strongSelf.chatListDisplayNode.mainContainerNode.currentItemNode.chatListFilter?.id, completion: { [weak self] controller in
+                                
                                 self?.chatListDisplayNode.mainContainerNode.currentItemNode.clearHighlightAnimated(true)
+                                
                                 if let promoInfo = promoInfo {
                                     switch promoInfo {
                                     case .proxy:
@@ -1331,6 +1337,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                         
                         let contextController = ContextController(account: strongSelf.context.account, presentationData: strongSelf.presentationData, source: source, items: chatContextMenuItems(context: strongSelf.context, peerId: peer.peerId, promoInfo: promoInfo, source: .chatList(filter: strongSelf.chatListDisplayNode.mainContainerNode.currentItemNode.chatListFilter), chatListController: strongSelf, joined: joined) |> map { ContextController.Items(content: .list($0)) }, gesture: gesture)
                         strongSelf.presentInGlobalOverlay(contextController)
+                        strongSelf.currentContextController = contextController
                     }
                 case let .forum(pinnedIndex, _, threadId, _, _):
                     let isPinned: Bool

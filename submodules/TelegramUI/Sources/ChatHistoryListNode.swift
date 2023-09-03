@@ -1631,7 +1631,7 @@ public final class ChatHistoryListNode: ListView, ChatHistoryNode {
             }
         })
         
-        self.visibleContentOffsetChanged = { [weak self] offset in
+        self.visibleContentOffsetChanged = { [weak self] offset, _ in
             if let strongSelf = self {
                 strongSelf.contentPositionChanged(offset)
                 

@@ -159,12 +159,20 @@ public extension ContainedViewLayoutTransition {
                     completion(true)
                 }
             case let .animated(duration, curve):
+                
+                guard !GlobalPullToArchiveState.shared.isScrollingUnderPullToArchive else {
+                    
+                    completion?(false)
+                    return
+                }
+                
                 let previousFrame: CGRect
                 if beginWithCurrentState, (node.layer.animation(forKey: "position") != nil || node.layer.animation(forKey: "bounds") != nil), let presentation = node.layer.presentation() {
                     previousFrame = presentation.frame
                 } else {
                     previousFrame = node.frame
                 }
+                
                 node.frame = frame
                 node.layer.animateFrame(from: previousFrame, to: frame, duration: duration, delay: delay, timingFunction: curve.timingFunction, mediaTimingFunction: curve.mediaTimingFunction, force: force, completion: { result in
                     if let completion = completion {

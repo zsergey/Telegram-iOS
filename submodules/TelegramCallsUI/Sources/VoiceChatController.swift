@@ -2223,7 +2223,7 @@ public final class VoiceChatControllerImpl: ViewController, VoiceChatController 
                 }
             }
             
-            self.listNode.visibleContentOffsetChanged = { [weak self] offset in
+            self.listNode.visibleContentOffsetChanged = { [weak self] offset, _ in
                 guard let strongSelf = self else {
                     return
                 }

@@ -1186,7 +1186,7 @@ public final class ChatListNode: ListView {
         }
     }
     
-    public var contentOffsetChanged: ((ListViewVisibleContentOffset) -> Void)?
+    public var contentOffsetChanged: ((ListViewVisibleContentOffset, Bool, Bool) -> Void)?
     public var contentScrollingEnded: ((ListView) -> Bool)?
     public var didBeginInteractiveDragging: ((ListView) -> Void)?
     
@@ -1232,7 +1232,9 @@ public final class ChatListNode: ListView {
     }
     
     public var startedScrollingAtUpperBound: Bool = false
-    
+
+    public var startedHasItemsToBeRevealed: Bool = false
+
     private let autoSetReady: Bool
     
     public init(context: AccountContext, location: ChatListControllerLocation, chatListFilter: ChatListFilter? = nil, previewing: Bool, fillPreloadItems: Bool, mode: ChatListNodeMode, isPeerEnabled: ((EnginePeer) -> Bool)? = nil, theme: PresentationTheme, fontSize: PresentationFontSize, strings: PresentationStrings, dateTimeFormat: PresentationDateTimeFormat, nameSortOrder: PresentationPersonNameOrder, nameDisplayOrder: PresentationPersonNameOrder, animationCache: AnimationCache, animationRenderer: MultiAnimationRenderer, disableAnimations: Bool, isInlineMode: Bool, autoSetReady: Bool) {
@@ -2434,6 +2436,7 @@ public final class ChatListNode: ListView {
                         }
                     }
                 }
+                
                 if !isHiddenItemVisible && strongSelf.currentState.hiddenItemShouldBeTemporaryRevealed {
                     strongSelf.updateState { state in
                         var state = state
@@ -2441,6 +2444,7 @@ public final class ChatListNode: ListView {
                         return state
                     }
                 }
+                
                 if !refreshStoryPeerIds.isEmpty {
                     strongSelf.context.account.viewTracker.refreshStoryStatsForPeerIds(peerIds: refreshStoryPeerIds)
                 }
@@ -2781,6 +2785,8 @@ public final class ChatListNode: ListView {
             guard let strongSelf = self else {
                 return
             }
+            strongSelf.startedHasItemsToBeRevealed = strongSelf.hasItemsToBeRevealed()
+            
             switch strongSelf.visibleContentOffset() {
             case .none, .unknown:
                 strongSelf.startedScrollingAtUpperBound = false
@@ -2837,7 +2843,7 @@ public final class ChatListNode: ListView {
             }
         })
         
-        self.visibleContentOffsetChanged = { [weak self] offset in
+        self.visibleContentOffsetChanged = { [weak self] offset, isTracking in
             guard let strongSelf = self else {
                 return
             }
@@ -2845,20 +2851,29 @@ public final class ChatListNode: ListView {
                 return
             }
             let atTop: Bool
-            var revealHiddenItems: Bool = false
+            //var revealHiddenItems: Bool = false
             switch offset {
                 case .none, .unknown:
                     atTop = false
                 case let .known(value):
+                
                 atTop = value <= -strongSelf.tempTopInset
                     if strongSelf.startedScrollingAtUpperBound && startedScrollingWithCanExpandHiddenItems && strongSelf.isTracking {
-                        revealHiddenItems = value <= -strongSelf.tempTopInset - 60.0
+                        //revealHiddenItems = value <= -strongSelf.tempTopInset - 60.0
                     }
             }
             strongSelf.scrolledAtTopValue = atTop
-            strongSelf.contentOffsetChanged?(offset)
-            if revealHiddenItems && !strongSelf.currentState.hiddenItemShouldBeTemporaryRevealed {
-                //strongSelf.revealScrollHiddenItem()
+            
+            let allowsExpaning = strongSelf.startedHasItemsToBeRevealed && strongSelf.startedScrollingAtUpperBound
+            strongSelf.contentOffsetChanged?(offset, isTracking, allowsExpaning)
+            
+            let state = GlobalPullToArchiveState.shared
+            if !isTracking && state.isDraggingEndedInReleaseState &&
+                !strongSelf.currentState.hiddenItemShouldBeTemporaryRevealed {
+                
+                state.isScrollingUnderPullToArchive = false
+                
+                strongSelf.revealScrollHiddenItem()
             }
         }
         
@@ -2929,6 +2944,7 @@ public final class ChatListNode: ListView {
                 }
             }
         })
+        
         if isHiddenItemVisible && !self.currentState.hiddenItemShouldBeTemporaryRevealed {
             if self.hapticFeedback == nil {
                 self.hapticFeedback = HapticFeedback()

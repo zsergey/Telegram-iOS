@@ -253,7 +253,7 @@ final class PeerSelectionControllerNode: ASDisplayNode {
             self?.requestOpenDisabledPeer?(peer, threadId)
         }
         
-        self.chatListNode?.contentOffsetChanged = { [weak self] offset in
+        self.chatListNode?.contentOffsetChanged = { [weak self] offset, _, _ in
             guard let strongSelf = self else {
                 return
             }
@@ -262,7 +262,7 @@ final class PeerSelectionControllerNode: ASDisplayNode {
             }
         }
            
-        self.mainContainerNode?.contentOffsetChanged = { [weak self] offset, _ in
+        self.mainContainerNode?.contentOffsetChanged = { [weak self] offset, _, _, _ in
             guard let strongSelf = self else {
                 return
             }

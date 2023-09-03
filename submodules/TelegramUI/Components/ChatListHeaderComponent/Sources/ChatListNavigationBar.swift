@@ -155,6 +155,8 @@ public final class ChatListNavigationBar: Component {
         public let headerContent = ComponentView<Empty>()
         
         public private(set) var searchContentNode: NavigationBarSearchContentNode?
+        public private(set) var pullToArchiveNode: PullToArchiveNode?
+        public private(set) var lastChatListContainerViewFrame: CGRect = .zero
         
         private var component: ChatListNavigationBar?
         private weak var state: EmptyComponentState?
@@ -178,6 +180,7 @@ public final class ChatListNavigationBar: Component {
         private var disappearingTabsViewSearch: Bool = false
         
         private var currentHeaderComponent: ChatListHeaderComponent?
+        //private var lastStoriesOffsetFraction: CGFloat = 0
         
         override public init(frame: CGRect) {
             self.backgroundView = BlurredBackgroundView(color: .clear, enableBlur: true)
@@ -215,11 +218,23 @@ public final class ChatListNavigationBar: Component {
         
         public func applyCurrentScroll(transition: Transition) {
             if let rawScrollOffset = self.rawScrollOffset, self.hasDeferredScrollOffset {
-                self.applyScroll(offset: rawScrollOffset, allowAvatarsExpansion: self.currentAllowAvatarsExpansion, transition: transition)
+                self.applyScroll(offset: rawScrollOffset, allowAvatarsExpansion: self.currentAllowAvatarsExpansion, transition: transition, isTracking: false, hasItemsToBeRevealed: false)
             }
         }
         
-        public func applyScroll(offset: CGFloat, allowAvatarsExpansion: Bool, forceUpdate: Bool = false, transition: Transition) {
+        public func didBeginInteractiveDragging() {
+            pullToArchiveNode?.pullToArchiveView.willBeginDragging()
+        }
+        
+        public func endedInteractiveDragging() {
+            pullToArchiveNode?.pullToArchiveView.didEndDragging()
+        }
+        
+        public func contentScrollingEnded() {
+            GlobalPullToArchiveState.shared.isScrollingUnderPullToArchive = false
+        }
+        
+        public func applyScroll(offset: CGFloat, allowAvatarsExpansion: Bool, forceUpdate: Bool = false, transition: Transition, isTracking: Bool, hasItemsToBeRevealed: Bool) {
             let transition = transition
             
             self.rawScrollOffset = offset
@@ -248,6 +263,8 @@ public final class ChatListNavigationBar: Component {
             if self.clippedScrollOffset == clippedScrollOffset && !self.hasDeferredScrollOffset && !forceUpdate && !allowAvatarsExpansionUpdated {
                 return
             }
+            
+            // здесь надо оверскролл делать
             self.hasDeferredScrollOffset = false
             self.clippedScrollOffset = clippedScrollOffset
             
@@ -263,6 +280,7 @@ public final class ChatListNavigationBar: Component {
             
             transition.setFrameWithAdditivePosition(layer: self.separatorLayer, frame: CGRect(origin: CGPoint(x: 0.0, y: visibleSize.height), size: CGSize(width: visibleSize.width, height: UIScreenPixel)))
             
+            // Нода поиска, это два if на создание и обновлении темы
             let searchContentNode: NavigationBarSearchContentNode
             if let current = self.searchContentNode {
                 searchContentNode = current
@@ -299,10 +317,27 @@ public final class ChatListNavigationBar: Component {
                 self.addSubview(searchContentNode.view)
             }
             
+            // Добавление пулл ту рефреш нод
+            var pullToArchiveNode: PullToArchiveNode
+            if let current = self.pullToArchiveNode {
+                pullToArchiveNode = current
+                
+            } else {
+
+                pullToArchiveNode = PullToArchiveNode()
+                pullToArchiveNode.pullToArchiveView.isUserInteractionEnabled = false
+                pullToArchiveNode.pullToArchiveView.animationDidFinish = {
+                }
+                pullToArchiveNode.view.layer.anchorPoint = CGPoint()
+                pullToArchiveNode.view.frame = .zero
+                self.pullToArchiveNode = pullToArchiveNode
+                self.addSubview(pullToArchiveNode.view)
+            }
+            
             let searchSize = CGSize(width: currentLayout.size.width - 6.0 * 2.0, height: navigationBarSearchContentHeight)
             var searchFrame = CGRect(origin: CGPoint(x: 6.0, y: visibleSize.height - searchSize.height), size: searchSize)
             if component.tabsNode != nil {
-                searchFrame.origin.y -= 40.0
+                searchFrame.origin.y -= 40.0 // поднимаем поиск если есть табы
             }
             if !component.isSearchActive {
                 searchFrame.origin.y -= component.accessoryPanelContainerHeight
@@ -320,6 +355,7 @@ public final class ChatListNavigationBar: Component {
             
             let storiesOffsetFraction: CGFloat
             let storiesUnlocked: Bool
+            var allowsExpandingHiddenItem: Bool
             if allowAvatarsExpansion {
                 storiesOffsetFraction = max(0.0, min(4.0, -offset / ChatListNavigationBar.storiesScrollHeight))
                 if offset <= -65.0 {
@@ -329,9 +365,40 @@ public final class ChatListNavigationBar: Component {
                 } else {
                     storiesUnlocked = self.storiesUnlocked
                 }
+                allowsExpandingHiddenItem = offset <= -ChatListNavigationBar.storiesScrollHeight
             } else {
                 storiesOffsetFraction = 0.0
                 storiesUnlocked = false
+                allowsExpandingHiddenItem = true
+            }
+            
+            let cellHeight: CGFloat = GlobalPullToArchiveState.shared.cellHeight
+            pullToArchiveNode.pullToArchiveView.cellHeight = cellHeight
+            pullToArchiveNode.pullToArchiveView.topConstant = visibleSize.height
+            
+            let pullToArchiveFraction = hasItemsToBeRevealed && allowsExpandingHiddenItem ? max(0, storiesOffsetFraction - 1) : 0
+            var pullToArchiveHeight = cellHeight * pullToArchiveFraction
+            let elasticThreshold: CGFloat = cellHeight // * 1.2
+            let exponent: CGFloat = 0.7
+            if pullToArchiveHeight > elasticThreshold {
+                let overshoot = pullToArchiveHeight - elasticThreshold
+                pullToArchiveHeight = elasticThreshold + pow(overshoot, exponent)
+            }
+            pullToArchiveNode.pullToArchiveView.height = pullToArchiveHeight
+            print("pullToArchiveHeight \(pullToArchiveHeight)")
+            
+            let chatListContainerView = self.superview?.subviews.first
+            var chatContainerViewOriginY = pullToArchiveHeight
+            if pullToArchiveNode.pullToArchiveView.isRefreshing && pullToArchiveHeight <= cellHeight {
+                chatContainerViewOriginY = 0
+            }
+            let state = GlobalPullToArchiveState.shared
+            if pullToArchiveHeight > 0 {
+                state.isScrollingUnderPullToArchive = true
+            }
+            if let view = chatListContainerView {
+                view.frame = CGRect(origin: CGPoint(x: 0, y: chatContainerViewOriginY),
+                                    size: view.frame.size)
             }
             
             if allowAvatarsExpansion, transition.animation.isImmediate, let storySubscriptions = component.storySubscriptions, !storySubscriptions.items.isEmpty {
@@ -425,7 +492,7 @@ public final class ChatListNavigationBar: Component {
                     }
                 }
             }
-            
+
             if component.tabsNode !== self.tabsNode {
                 if let tabsNode = self.tabsNode {
                     tabsNode.layer.anchorPoint = CGPoint()
@@ -445,15 +512,19 @@ public final class ChatListNavigationBar: Component {
                 }
             }
             
-            var tabsFrame = CGRect(origin: CGPoint(x: 0.0, y: visibleSize.height), size: CGSize(width: visibleSize.width, height: 46.0))
+            let tabsHeight: CGFloat = 46.0
+            let staffY = visibleSize.height
+            let staffOrigin = CGPoint(x: 0.0, y: staffY)
+            
+            var tabsFrame = CGRect(origin: staffOrigin, size: CGSize(width: visibleSize.width, height: tabsHeight))
             if !component.isSearchActive {
                 tabsFrame.origin.y -= component.accessoryPanelContainerHeight
             }
             if component.tabsNode != nil {
-                tabsFrame.origin.y -= 46.0
+                tabsFrame.origin.y -= tabsHeight
             }
             
-            var accessoryPanelContainerFrame = CGRect(origin: CGPoint(x: 0.0, y: visibleSize.height), size: CGSize(width: visibleSize.width, height: component.accessoryPanelContainerHeight))
+            var accessoryPanelContainerFrame = CGRect(origin: staffOrigin, size: CGSize(width: visibleSize.width, height: component.accessoryPanelContainerHeight))
             if !component.isSearchActive {
                 accessoryPanelContainerFrame.origin.y -= component.accessoryPanelContainerHeight
             }
@@ -506,6 +577,8 @@ public final class ChatListNavigationBar: Component {
                 
                 tabsNodeTransition.setFrameWithAdditivePosition(view: accessoryPanelContainer.view, frame: accessoryPanelContainerFrame)
             }
+            
+            //self.lastStoriesOffsetFraction = storiesOffsetFraction
         }
         
         public func updateStoryUploadProgress(storyUploadProgress: Float?) {
@@ -616,7 +689,7 @@ public final class ChatListNavigationBar: Component {
             
             if uploadProgressUpdated || storySubscriptionsUpdated {
                 if let rawScrollOffset = self.rawScrollOffset {
-                    self.applyScroll(offset: rawScrollOffset, allowAvatarsExpansion: self.currentAllowAvatarsExpansion, forceUpdate: true, transition: transition)
+                    self.applyScroll(offset: rawScrollOffset, allowAvatarsExpansion: self.currentAllowAvatarsExpansion, forceUpdate: true, transition: transition, isTracking: false, hasItemsToBeRevealed: false)
                 }
             }
             

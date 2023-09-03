@@ -15,6 +15,17 @@ var testSpringFreeResistance: CGFloat = 0.676197171211243
 var testSpringResistanceScrollingLimits: (CGFloat, CGFloat) = (0.1, 1.0)
 var testSpringScrollingResistance: CGFloat = 0.6721
 
+/// I had to use the singleton to finish my contest task in the deadline.
+/// Usally I don't use this pattern and even have forgotten that it exists.
+public class GlobalPullToArchiveState {
+    public static let shared = GlobalPullToArchiveState()
+    
+    public weak var scrollView: UIScrollView?
+    public var isDraggingEndedInReleaseState: Bool = false
+    public var isScrollingUnderPullToArchive: Bool = false
+    public var cellHeight: CGFloat = 104
+}
+
 struct ListViewItemSpring {
     let stiffness: CGFloat
     let damping: CGFloat
@@ -145,7 +156,7 @@ open class ListViewItemNode: ASDisplayNode, AccessibilityFocusableNode {
     open var visibility: ListViewItemNodeVisibility = .none
     
     open var canBeSelected: Bool {
-        return true
+        return true 
     }
     
     open func visibleForSelection(at point: CGPoint) -> Bool {
@@ -185,7 +196,11 @@ open class ListViewItemNode: ASDisplayNode, AccessibilityFocusableNode {
             return self._contentSize
         } set(value) {
             let effectiveInsets = self.insets
-            self.frame = CGRect(origin: self.frame.origin, size: CGSize(width: value.width, height: value.height + effectiveInsets.top + effectiveInsets.bottom))
+            let height = value.height + effectiveInsets.top + effectiveInsets.bottom
+            self.frame = CGRect(origin: self.frame.origin, size: CGSize(width: value.width, height: height))
+            if height != 0 {
+                GlobalPullToArchiveState.shared.cellHeight = height
+            }
         }
     }
     

@@ -336,7 +336,7 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
     
     public private(set) final var opaqueTransactionState: Any?
     
-    public final var visibleContentOffsetChanged: (ListViewVisibleContentOffset) -> Void = { _ in }
+    public final var visibleContentOffsetChanged: (ListViewVisibleContentOffset, Bool) -> Void = { _, _ in }
     public final var visibleBottomContentOffsetChanged: (ListViewVisibleContentOffset) -> Void = { _ in }
     public final var beganInteractiveDragging: (CGPoint) -> Void = { _ in }
     public final var endedInteractiveDragging: (CGPoint) -> Void = { _ in }
@@ -863,6 +863,9 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
     }
     
     public func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        
+        GlobalPullToArchiveState.shared.scrollView = scrollView
+        
         self.isDragging = false
         if decelerate {
             self.lastContentOffsetTimestamp = CACurrentMediaTime()
@@ -1056,7 +1059,7 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
         }
         
         if !self.snapToBounds(snapTopItem: false, stackFromBottom: self.stackFromBottom, insetDeltaOffsetFix: 0.0).offset.isZero {
-            self.updateVisibleContentOffset()
+            self.updateVisibleContentOffset(isTracking: scrollView.isTracking)
         }
         self.updateScroller(transition: .immediate)
         
@@ -1088,7 +1091,7 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
             self.setNeedsAnimations()
         }
         
-        self.updateVisibleContentOffset()
+        self.updateVisibleContentOffset(isTracking: scrollView.isTracking)
         self.updateVisibleItemRange()
         self.updateItemNodesVisibilities(onlyPositive: false)
         
@@ -1410,8 +1413,8 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
         return offset
     }
     
-    private func updateVisibleContentOffset() {
-        self.visibleContentOffsetChanged(self.visibleContentOffset())
+    private func updateVisibleContentOffset(isTracking: Bool) {
+        self.visibleContentOffsetChanged(self.visibleContentOffset(), isTracking)
         self.visibleBottomContentOffsetChanged(self.visibleBottomContentOffset())
     }
     
@@ -2337,6 +2340,7 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
                 completion(state, operations)
                 break
             } else {
+
                 let updateItem = updateIndicesAndItems[0]
                 if let previousNode = previousNodes[updateItem.index] {
                     self.nodeForItem(synchronous: synchronous, synchronousLoads: synchronousLoads, item: updateItem.item, previousNode: previousNode, index: updateItem.index, previousItem: updateItem.index == 0 ? nil : self.items[updateItem.index - 1], nextItem: updateItem.index == (self.items.count - 1) ? nil : self.items[updateItem.index + 1], params: ListViewItemLayoutParams(width: state.visibleSize.width, leftInset: state.insets.left, rightInset: state.insets.right, availableHeight: state.visibleSize.height - state.insets.top - state.insets.bottom), updateAnimationIsAnimated: animated, updateAnimationIsCrossfade: crossfade, completion: { _, layout, apply in
@@ -3069,7 +3073,7 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
                 var completeOffset = offsetFix
                 
                 if !snapToBoundsOffset.isZero {
-                    self.updateVisibleContentOffset()
+                    self.updateVisibleContentOffset(isTracking: isTracking)
                 }
                 
                 sizeAndInsetsOffset = offsetFix
@@ -3146,7 +3150,7 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
                 self.visibleSize = updateSizeAndInsets.size
                 
                 if !self.snapToBounds(snapTopItem: scrollToItem != nil && scrollToItem?.directionHint != .Down, stackFromBottom: self.stackFromBottom, insetDeltaOffsetFix: 0.0).offset.isZero {
-                    self.updateVisibleContentOffset()
+                    self.updateVisibleContentOffset(isTracking: isTracking)
                 }
             }
             
@@ -3221,7 +3225,7 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
             }
 
             if !snapToBoundsOffset.isZero {
-                self.updateVisibleContentOffset()
+                self.updateVisibleContentOffset(isTracking: isTracking)
             }
 
             if let snapshotView = snapshotView {
@@ -3538,7 +3542,7 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
             
             self.setNeedsAnimations()
             
-            self.updateVisibleContentOffset()
+            self.updateVisibleContentOffset(isTracking: isTracking)
             
             if self.debugInfo {
                 //let delta = CACurrentMediaTime() - timestamp
@@ -3561,7 +3565,7 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
             }
             
             if !self.useMainQueueTransactions {
-                self.updateVisibleContentOffset()
+                self.updateVisibleContentOffset(isTracking: isTracking)
             }
             
             if self.debugInfo {
@@ -3572,7 +3576,7 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
             completion()
             
             if self.useMainQueueTransactions {
-                self.updateVisibleContentOffset()
+                self.updateVisibleContentOffset(isTracking: isTracking)
             }
         }
     }
@@ -4470,7 +4474,7 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
             }
             
             if !self.snapToBounds(snapTopItem: false, stackFromBottom: self.stackFromBottom, insetDeltaOffsetFix: 0.0).offset.isZero {
-                self.updateVisibleContentOffset()
+                self.updateVisibleContentOffset(isTracking: isTracking)
             }
         }
         
@@ -4573,7 +4577,7 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
                                             }
                                         }
                                         if strongSelf.items[index].selectable {
-                                            itemNode.setHighlighted(true, at: itemPoint, animated: false)
+                                            /*itemNode.setHighlighted(true, at: itemPoint, animated: false)*/
                                         }
                                         
                                         if itemNode.canBeLongTapped {
@@ -4832,8 +4836,8 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
                                             self.reorderHeaderNodeToFront(headerNode)
                                         }
                                     }
-                                    let itemNodeFrame = itemNode.frame
-                                    itemNode.setHighlighted(true, at: selectionTouchLocation.offsetBy(dx: -itemNodeFrame.minX, dy: -itemNodeFrame.minY), animated: false)
+                                    /*let itemNodeFrame = itemNode.frame
+                                    itemNode.setHighlighted(true, at: selectionTouchLocation.offsetBy(dx: -itemNodeFrame.minX, dy: -itemNodeFrame.minY), animated: false)*/
                                 } else {
                                     self.highlightedItemIndex = nil
                                     itemNode.tapped()

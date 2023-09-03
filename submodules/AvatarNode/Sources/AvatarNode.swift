@@ -89,14 +89,11 @@ private func calculateColors(explicitColorIndex: Int?, peerId: EnginePeer.Id?, i
             colors = AvatarNode.savedMessagesColors
         } else if case .editAvatarIcon = icon, let theme {
             colors = [theme.list.itemAccentColor.withAlphaComponent(0.1), theme.list.itemAccentColor.withAlphaComponent(0.1)]
-        } else if case let .archivedChatsIcon(hiddenByDefault) = icon, let theme = theme {
-            let backgroundColors: (UIColor, UIColor)
-            if hiddenByDefault {
-                backgroundColors = theme.chatList.unpinnedArchiveAvatarColor.backgroundColors.colors
-            } else {
-                backgroundColors = theme.chatList.pinnedArchiveAvatarColor.backgroundColors.colors
-            }
-            colors = [backgroundColors.1, backgroundColors.0]
+        } else if case .archivedChatsIcon = icon {
+            /// TODO: Make it better. 
+            let blueStarColor = UIColor(rgb: 0x3D86EB)
+            colors = [blueStarColor, blueStarColor]
+
         } else {
             colors = AvatarNode.grayscaleColors
         }

@@ -76,6 +76,7 @@ public final class ContextGesture: UIGestureRecognizer, UIGestureRecognizerDeleg
     public var activated: ((ContextGesture, CGPoint) -> Void)?
     public var externalUpdated: ((UIView?, CGPoint) -> Void)?
     public var externalEnded: (((UIView?, CGPoint)?) -> Void)?
+    public var notActivated: (((UIView?, CGPoint)?) -> Void)?
     public var activatedAfterCompletion: ((CGPoint, Bool) -> Void)?
     public var cancelGesturesOnActivation: (() -> Void)?
     
@@ -223,6 +224,10 @@ public final class ContextGesture: UIGestureRecognizer, UIGestureRecognizerDeleg
                 if !self.wasActivated && self.activateOnTap {
                     self.activatedAfterCompletion?(touch.location(in: self.view), true)
                 }
+            }
+            
+            if !self.wasActivated {
+                self.notActivated?((self.view, touch.location(in: self.view)))
             }
             
             self.externalEnded?((self.view, touch.location(in: self.view)))

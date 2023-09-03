@@ -838,7 +838,6 @@ public final class StoryPeerListComponent: Component {
                 self.overscrollHiddenChatItemsAllowed = false
             }
             
-            //print("overscrollStage2: \(overscrollStage2)")
             if let overscrollFocusIndex, overscrollStage2 >= 1.19 {
                 self.overscrollSelectedId = self.sortedItems[overscrollFocusIndex].peer.id
             } else {
@@ -879,13 +878,14 @@ public final class StoryPeerListComponent: Component {
                 let minimizedItemScale = minimizedDefaultItemScale
                 
                 let minimizedMaxItemScale: CGFloat = (24.0 + 4.0) / 52.0
-                
-                let overscrollScaleFactor: CGFloat
-                if index == overscrollFocusIndex {
+ 
+                /// TODO
+                let overscrollScaleFactor: CGFloat = 0
+                /*if index == overscrollFocusIndex {
                     overscrollScaleFactor = 1.0
                 } else {
                     overscrollScaleFactor = 0.0
-                }
+                }*/
                 var maximizedItemScale: CGFloat = 1.0 + overscrollStage1 * 0.1 + overscrollScaleFactor * overscrollStage2 * 0.5
                 maximizedItemScale = min(1.6, maximizedItemScale)
                 
@@ -903,10 +903,11 @@ public final class StoryPeerListComponent: Component {
                     }
                     adjustedRegularFrame.origin.x -= effectiveVisibleBounds.minX
                     
-                    if let overscrollFocusIndex {
+                    // TODO
+                    /*if let overscrollFocusIndex {
                         let focusIndexOffset: CGFloat = max(-1.0, min(1.0, CGFloat(index - overscrollFocusIndex)))
                         adjustedRegularFrame.origin.x += focusIndexOffset * overscrollStage2 * 0.3 * adjustedRegularFrame.width * 0.5
-                    }
+                    }*/
                     
                     let collapsedItemPosition: CGPoint = collapsedItemFrame.center.interpolate(to: collapsedMaxItemFrame.center, amount: collapsedState.minFraction)
                     

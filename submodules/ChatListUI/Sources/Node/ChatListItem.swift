@@ -1309,6 +1309,14 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
             }
             item.interaction.activateChatPreview(item, threadId, strongSelf.contextContainer, gesture, nil)
         }
+        self.contextContainer.notActivated = { [weak self] selectionTouchLocation in
+            guard let strongSelf = self else {
+                return
+            }
+            let itemNode = strongSelf
+            let itemNodeFrame = itemNode.frame
+            itemNode.setHighlighted(true, at: selectionTouchLocation.offsetBy(dx: -itemNodeFrame.minX, dy: -itemNodeFrame.minY), animated: false)
+        }
         
         self.onDidLoad { [weak self] _  in
             guard let self else {

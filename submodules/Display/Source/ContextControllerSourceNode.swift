@@ -17,6 +17,7 @@ open class ContextControllerSourceNode: ContextReferenceContentNode {
     public var animateScale: Bool = true
     
     public var activated: ((ContextGesture, CGPoint) -> Void)?
+    public var notActivated: ((CGPoint) -> Void)?
     public var shouldBegin: ((CGPoint) -> Bool)?
     public var customActivationProgress: ((CGFloat, ContextGestureTransition) -> Void)?
     public weak var additionalActivationProgressLayer: CALayer?
@@ -68,8 +69,8 @@ open class ContextControllerSourceNode: ContextReferenceContentNode {
                 }
                 
                 let scaleSide = targetContentRect.width
-                let minScale: CGFloat = max(0.7, (scaleSide - 15.0) / scaleSide)
-                let currentScale = 1.0 * (1.0 - progress) + minScale * progress
+                let maxScale: CGFloat = min(1.3, (scaleSide + 15.0) / scaleSide)
+                let currentScale = 1.0 * (1.0 - progress) + maxScale * progress
                 
                 let originalCenterOffsetX: CGFloat = targetNode.bounds.width / 2.0 - targetContentRect.midX
                 let scaledCenterOffsetX: CGFloat = originalCenterOffsetX * currentScale
@@ -79,6 +80,12 @@ open class ContextControllerSourceNode: ContextReferenceContentNode {
                 
                 let scaleMidX: CGFloat = scaledCenterOffsetX - originalCenterOffsetX
                 let scaleMidY: CGFloat = scaledCenterOffsetY - originalCenterOffsetY
+                
+                let maxRadius: CGFloat = 5
+                let currentRadius = 1.0 * (1.0 - progress) + maxRadius * progress - 1.0
+                let shadowColor = UIColor.black.withAlphaComponent(0.15)
+                let shadow = Shadow(color: shadowColor, radius: currentRadius, offset: .zero)
+                targetNode.layer.superlayer?.applyShadow(shadow)
                 
                 switch update {
                 case .update:
@@ -122,6 +129,12 @@ open class ContextControllerSourceNode: ContextReferenceContentNode {
             } else {
                 gesture.cancel()
             }
+        }
+        contextGesture.notActivated = { [weak self] viewAndLocation in
+            guard let strongSelf = self, let viewAndLocation = viewAndLocation else {
+                return
+            }
+            strongSelf.notActivated?(viewAndLocation.1)
         }
         contextGesture.isEnabled = self.isGestureEnabled
     }
@@ -410,5 +423,37 @@ open class ContextControllerSourceView: UIView {
         self.contextGesture?.cancel()
         self.contextGesture?.isEnabled = false
         self.contextGesture?.isEnabled = self.isGestureEnabled
+    }
+}
+
+struct Shadow: Equatable {
+    
+    var color: UIColor
+    var opacity: Float
+    var radius: CGFloat
+    var offset: CGSize
+
+    init(color: UIColor, opacity: Float = 1, radius: CGFloat, offset: CGSize) {
+        self.color = color
+        self.opacity = opacity
+        self.radius = radius
+        self.offset = offset
+    }
+}
+
+extension CALayer {
+    
+    func applyShadow(_ shadow: Shadow?) {
+        
+        guard let shadow = shadow else {
+            
+            shadowOpacity = 0
+            return
+        }
+        
+        shadowOpacity = shadow.opacity
+        shadowColor = shadow.color.cgColor
+        shadowRadius = shadow.radius
+        shadowOffset = shadow.offset
     }
 }
