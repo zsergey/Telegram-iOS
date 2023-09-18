@@ -90,10 +90,7 @@ private func calculateColors(explicitColorIndex: Int?, peerId: EnginePeer.Id?, i
         } else if case .editAvatarIcon = icon, let theme {
             colors = [theme.list.itemAccentColor.withAlphaComponent(0.1), theme.list.itemAccentColor.withAlphaComponent(0.1)]
         } else if case .archivedChatsIcon = icon {
-            /// TODO: Make it better. 
-            let blueStarColor = UIColor(rgb: 0x3D86EB)
-            colors = [blueStarColor, blueStarColor]
-
+            colors = AvatarNode.savedMessagesColors
         } else {
             colors = AvatarNode.grayscaleColors
         }
@@ -205,6 +202,9 @@ public final class AvatarEditOverlayNode: ASDisplayNode {
 }
 
 public final class AvatarNode: ASDisplayNode {
+    
+    public var isArchive: Bool = false
+    
     public static let gradientColors: [[UIColor]] = [
         [UIColor(rgb: 0xff516a), UIColor(rgb: 0xff885e)],
         [UIColor(rgb: 0xffa85c), UIColor(rgb: 0xffcd6a)],
@@ -865,6 +865,7 @@ public final class AvatarNode: ASDisplayNode {
             return
         }
         
+        
         let size = self.bounds.size
         
         if let storyStats = self.storyStats {
@@ -872,7 +873,11 @@ public final class AvatarNode: ASDisplayNode {
             let inactiveLineWidth = storyPresentationParams.inactiveLineWidth
             let indicatorSize = CGSize(width: size.width - activeLineWidth * 4.0, height: size.height - activeLineWidth * 4.0)
             let avatarScale = (size.width - activeLineWidth * 4.0) / size.width
-            
+
+            if isArchive {
+                PullToArchiveSettings.avatarScale = avatarScale
+            }
+
             let storyIndicator: ComponentView<Empty>
             var indicatorTransition = transition
             if let current = self.storyIndicator {
@@ -911,6 +916,10 @@ public final class AvatarNode: ASDisplayNode {
             }
             transition.setScale(view: self.contentNode.view, scale: avatarScale)
         } else {
+            if isArchive {
+                PullToArchiveSettings.avatarScale = 1.0
+            }
+
             transition.setScale(view: self.contentNode.view, scale: 1.0)
             if let storyIndicator = self.storyIndicator {
                 self.storyIndicator = nil

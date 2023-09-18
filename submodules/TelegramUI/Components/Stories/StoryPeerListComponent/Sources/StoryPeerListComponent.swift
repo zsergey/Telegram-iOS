@@ -879,13 +879,14 @@ public final class StoryPeerListComponent: Component {
                 
                 let minimizedMaxItemScale: CGFloat = (24.0 + 4.0) / 52.0
  
-                /// TODO
-                let overscrollScaleFactor: CGFloat = 0
-                /*if index == overscrollFocusIndex {
+                /// zsergey: Зумим одну сториз только если архив уже показан.
+                var overscrollScaleFactor: CGFloat = 0
+                let isArchiveVisible = !PullToArchiveSettings.areArchivedChatsHidden && !PullToArchiveSettings.isRefreshing
+                if index == overscrollFocusIndex && isArchiveVisible {
                     overscrollScaleFactor = 1.0
                 } else {
                     overscrollScaleFactor = 0.0
-                }*/
+                }
                 var maximizedItemScale: CGFloat = 1.0 + overscrollStage1 * 0.1 + overscrollScaleFactor * overscrollStage2 * 0.5
                 maximizedItemScale = min(1.6, maximizedItemScale)
                 
@@ -901,19 +902,26 @@ public final class StoryPeerListComponent: Component {
                     } else if index > collapseEndIndex {
                         adjustedRegularFrame = adjustedRegularFrame.interpolate(to: itemLayout.frame(at: effectiveFirstVisibleIndex + collapseEndIndex), amount: 0.0)
                     }
+                    
                     adjustedRegularFrame.origin.x -= effectiveVisibleBounds.minX
                     
-                    // TODO
-                    /*if let overscrollFocusIndex {
+                    if let overscrollFocusIndex, isArchiveVisible {
                         let focusIndexOffset: CGFloat = max(-1.0, min(1.0, CGFloat(index - overscrollFocusIndex)))
                         adjustedRegularFrame.origin.x += focusIndexOffset * overscrollStage2 * 0.3 * adjustedRegularFrame.width * 0.5
-                    }*/
+                    }
                     
                     let collapsedItemPosition: CGPoint = collapsedItemFrame.center.interpolate(to: collapsedMaxItemFrame.center, amount: collapsedState.minFraction)
                     
                     var itemPosition = collapsedItemPosition.interpolate(to: adjustedRegularFrame.center, amount: min(1.0, collapsedState.maxFraction))
                     
-                    itemPosition.y += realTimeOverscrollFraction * 83.0 * 0.5
+                    // zsergey: Добавляем упругости.
+                    // itemPosition.y += realTimeOverscrollFraction * 83.0 * 0.5
+                    var nextItemPositionY = itemPosition.y + realTimeOverscrollFraction * 83.0 * 0.5
+                    let elasticThreshold: CGFloat = itemPosition.y
+                    let exponent: CGFloat = 0.7
+                    let overshoot = nextItemPositionY - elasticThreshold
+                    nextItemPositionY = elasticThreshold + pow(overshoot, exponent)
+                    itemPosition.y = nextItemPositionY
                     
                     var bounceOffsetFraction = (adjustedRegularFrame.midX - itemLayout.frame(at: collapseStartIndex).midX) / itemLayout.containerSize.width
                     bounceOffsetFraction = max(-1.0, min(1.0, bounceOffsetFraction))

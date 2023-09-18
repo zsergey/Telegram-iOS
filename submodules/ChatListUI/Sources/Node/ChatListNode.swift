@@ -245,7 +245,7 @@ public struct ChatListNodeState: Equatable {
     public var peerInputActivities: ChatListNodePeerInputActivities?
     public var pendingRemovalItemIds: Set<ItemId>
     public var pendingClearHistoryPeerIds: Set<ItemId>
-    public var hiddenItemShouldBeTemporaryRevealed: Bool
+    public var hiddenItemShouldBeTemporaryRevealed: Bool 
     public var selectedAdditionalCategoryIds: Set<Int>
     public var hiddenPsaPeerId: EnginePeer.Id?
     public var foundPeers: [(EnginePeer, EnginePeer?)]
@@ -2864,14 +2864,14 @@ public final class ChatListNode: ListView {
             }
             strongSelf.scrolledAtTopValue = atTop
             
-            let allowsExpaning = strongSelf.startedHasItemsToBeRevealed && strongSelf.startedScrollingAtUpperBound
+            let allowsExpaning = strongSelf.startedHasItemsToBeRevealed
             strongSelf.contentOffsetChanged?(offset, isTracking, allowsExpaning)
             
-            let state = GlobalPullToArchiveState.shared
-            if !isTracking && state.isDraggingEndedInReleaseState &&
+            if !isTracking && PullToArchiveSettings.isDraggingEndedInReleaseState &&
                 !strongSelf.currentState.hiddenItemShouldBeTemporaryRevealed {
                 
-                state.isScrollingUnderPullToArchive = false
+                PullToArchiveSettings.isScrollingUnderPullToArchive = false
+                PullToArchiveSettings.isDraggingEndedInReleaseState = false
                 
                 strongSelf.revealScrollHiddenItem()
             }
@@ -2888,6 +2888,8 @@ public final class ChatListNode: ListView {
             return strongSelf.isSelectionGestureEnabled
         }
         self.view.addGestureRecognizer(selectionRecognizer)
+        
+        PullToArchiveSettings.addObserver(self)
     }
     
     deinit {
@@ -3968,4 +3970,25 @@ public class ChatHistoryListSelectionRecognizer: UIPanGestureRecognizer {
 
 func hideChatListContacts(context: AccountContext) {
     let _ = ApplicationSpecificNotice.setDisplayChatListContacts(accountManager: context.sharedContext.accountManager).start()
+}
+
+extension ChatListNode: PullToArchiveObserverProtocol {
+    
+    public func archivedChatsHidden(_ isHidden: Bool, node: ASDisplayNode) {
+        
+        if !isHidden && PullToArchiveSettings.hiddenByDefault {
+            
+            self.scroller.contentOffset.y += PullToArchiveSettings.cellHeight
+        }
+    }
+    
+    public func orientationChanged() {
+        
+        /*if PullToArchiveSettings.isScrollingUnderPullToArchive {
+            self.scroller.panGestureRecognizer.isEnabled = false
+            self.scroller.panGestureRecognizer.isEnabled = true
+        }*/
+        
+    }
+
 }

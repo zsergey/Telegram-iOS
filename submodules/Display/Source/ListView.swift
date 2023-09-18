@@ -864,8 +864,6 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
     
     public func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
         
-        GlobalPullToArchiveState.shared.scrollView = scrollView
-        
         self.isDragging = false
         if decelerate {
             self.lastContentOffsetTimestamp = CACurrentMediaTime()
@@ -1091,9 +1089,27 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
             self.setNeedsAnimations()
         }
         
+        // Запомним настоящий `rawOffset`
+        PullToArchiveSettings.rawOffset = scrollView.contentOffset.y
+        
         self.updateVisibleContentOffset(isTracking: scrollView.isTracking)
         self.updateVisibleItemRange()
         self.updateItemNodesVisibilities(onlyPositive: false)
+
+        // Определили что вся история движется вверх, скорректируем позицию `pullToArchiveView`
+        // Кривовато конечно, но надо сделать быстро.
+        if PullToArchiveSettings.isGoingToUp,
+           let pullToArchiveView = PullToArchiveSettings.pullToArchiveView {
+            
+            let searchScrollHeight = 52.0
+            /*if !PullToArchiveSettings.hasTabs {
+                searchScrollHeight -= 40.0
+            }*/
+            
+            let lastPosition = PullToArchiveSettings.lastPosition
+            let deltaY = max(PullToArchiveSettings.rawOffset - searchScrollHeight, 0)
+            pullToArchiveView.layer.position = CGPoint(x: lastPosition.x, y: lastPosition.y - deltaY)
+        }
         
         //CATransaction.commit()
     }
@@ -2826,7 +2842,13 @@ open class ListView: ASDisplayNode, UIScrollViewAccessibilityDelegate, UIGesture
                     let invertOffsetDirection = applyContext.invertOffsetDirection
                     
                     var offsetRanges = OffsetRanges()
-                    
+
+                    var animated = animated
+                    if node.isArchive {
+                        // zsergey: Отключаем анимацию для архива.
+                        animated = animated && !PullToArchiveSettings.isRefreshing
+                    }
+                
                     if animated {
                         if updatedInsets != previousInsets {
                             node.insets = previousInsets

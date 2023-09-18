@@ -12,6 +12,12 @@ public final class ListViewScroller: UIScrollView, UIGestureRecognizerDelegate {
         fatalError("init(coder:) has not been implemented")
     }
     
+    public override func layoutSubviews() {
+        super.layoutSubviews()
+        
+        PullToArchiveSettings.scrollViewWidth = frame.width
+    }
+    
     public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         if otherGestureRecognizer is ListViewTapGestureRecognizer {
             return true

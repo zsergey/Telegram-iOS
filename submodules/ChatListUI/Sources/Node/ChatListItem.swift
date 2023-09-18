@@ -244,6 +244,20 @@ public class ChatListItem: ListViewItem, ChatListSearchItemNeighbour {
                         node.setupItem(item: self, synchronousLoads: synchronousLoads)
                         apply(synchronousLoads, false)
                         node.updateIsHighlighted(transition: .immediate)
+                        
+                        var isArchive = false
+                        if case .groupReference(let groupReferenceData) = self.content, groupReferenceData.groupId == .archive {
+                            isArchive = true
+                        }
+                        
+                        Queue.mainQueue().async {
+                            node.isArchive = isArchive
+                            node.avatarNode.isArchive = isArchive
+                            if isArchive {
+                                PullToArchiveSettings.archivedChatsHidden(self.hiddenOffset, node: node)
+                            }
+                        }
+                        
                     })
                 })
             }
@@ -266,7 +280,21 @@ public class ChatListItem: ListViewItem, ChatListSearchItemNeighbour {
                     let (nodeLayout, apply) = layout(self, params, first, last, firstWithHeader, nextIsPinned)
                     Queue.mainQueue().async {
                         completion(nodeLayout, { _ in
-                            apply(false, animated)
+                            
+                            var isArchive = false
+                            if case .groupReference(let groupReferenceData) = self.content, groupReferenceData.groupId == .archive {
+                                isArchive = true
+                            }
+                            
+                            apply(false, isArchive ? false : animated)
+                            
+                            Queue.mainQueue().async {
+                                nodeValue.isArchive = isArchive
+                                nodeValue.avatarNode.isArchive = isArchive
+                                if isArchive {
+                                    PullToArchiveSettings.archivedChatsHidden(self.hiddenOffset, node: nodeValue)
+                                }
+                            }
                         })
                     }
                 }
@@ -1369,7 +1397,11 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
                 UIView.transition(with: self.avatarNode.view, duration: 0.3, options: [.transitionCrossDissolve], animations: {
                 }, completion: nil)
             }
+
+            PullToArchiveSettings.hiddenByDefault = groupReferenceData.hiddenByDefault
+            
             self.avatarNode.setPeer(context: item.context, theme: item.presentationData.theme, peer: peer, overrideImage: .archivedChatsIcon(hiddenByDefault: groupReferenceData.hiddenByDefault), emptyColor: item.presentationData.theme.list.mediaPlaceholderColor, synchronousLoad: synchronousLoads)
+            
         }
         
         self.avatarNode.setStoryStats(storyStats: storyState.flatMap { storyState in
@@ -1800,6 +1832,7 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
             let enableChatListPhotos = true
             
             let avatarDiameter = min(60.0, floor(item.presentationData.fontSize.baseDisplaySize * 60.0 / 17.0))
+            PullToArchiveSettings.avatarDiameter = avatarDiameter
             
             let avatarLeftInset: CGFloat
             if item.interaction.isInlineMode {
@@ -2696,7 +2729,9 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
             itemHeight += measureLayout.size.height * 3.0
             itemHeight += titleSpacing
             itemHeight += authorSpacing
-                        
+            
+            PullToArchiveSettings.cellHeight = itemHeight
+
             let rawContentRect = CGRect(origin: CGPoint(x: 2.0, y: layoutOffset + floor(item.presentationData.fontSize.itemListBaseFontSize * 8.0 / 17.0)), size: CGSize(width: rawContentWidth, height: itemHeight - 12.0 - 9.0))
             
             let insets = ChatListItemNode.insets(first: first, last: last, firstWithHeader: firstWithHeader)

@@ -159,13 +159,14 @@ public extension ContainedViewLayoutTransition {
                     completion(true)
                 }
             case let .animated(duration, curve):
-                
-                guard !GlobalPullToArchiveState.shared.isScrollingUnderPullToArchive else {
-                    
+
+                // Вот это надо хорошо тестировать zsergey
+                guard !PullToArchiveSettings.isScrollingUnderPullToArchive else {
+
                     completion?(false)
                     return
                 }
-                
+
                 let previousFrame: CGRect
                 if beginWithCurrentState, (node.layer.animation(forKey: "position") != nil || node.layer.animation(forKey: "bounds") != nil), let presentation = node.layer.presentation() {
                     previousFrame = presentation.frame

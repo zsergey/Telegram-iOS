@@ -63,3 +63,20 @@ extension CALayer {
         CGFloat(presentation()?.opacity ?? opacity)
     }
 }
+
+public extension CATransaction {
+
+    static func disableAnimations(_ completion: () -> Void) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        completion()
+        CATransaction.commit()
+    }
+}
+
+extension CGSize {
+    
+    static func square(_ size: CGFloat) -> CGSize {
+        CGSize(width: size, height: size)
+    }
+}

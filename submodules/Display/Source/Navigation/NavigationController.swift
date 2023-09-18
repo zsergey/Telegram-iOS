@@ -1342,6 +1342,8 @@ open class NavigationController: UINavigationController, ContainableController, 
     }
         
     public func pushViewController(_ controller: ViewController) {
+        PullToArchiveSettings.isRefreshing = false
+        PullToArchiveSettings.isScrollingUnderPullToArchive = false
         self.pushViewController(controller, completion: {})
     }
     

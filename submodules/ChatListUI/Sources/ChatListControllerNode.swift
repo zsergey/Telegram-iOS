@@ -2458,7 +2458,7 @@ final class ChatListControllerNode: ASDisplayNode, UIGestureRecognizerDelegate {
             
             if let controller = self.controller {
                 if let peerId = overscrollSelectedId {
-                    if self.allowOverscrollStoryExpansion && self.inlineStackContainerNode == nil && isPrimary {
+                    if self.allowOverscrollStoryExpansion && self.inlineStackContainerNode == nil && isPrimary && !PullToArchiveSettings.areArchivedChatsHidden {
                         let timestamp = CACurrentMediaTime()
                         if let _ = self.currentOverscrollStoryExpansionTimestamp {
                         } else {
@@ -2472,6 +2472,7 @@ final class ChatListControllerNode: ASDisplayNode, UIGestureRecognizerDelegate {
                             self.currentOverscrollItemExpansionTimestamp = nil
                             HapticFeedback().tap()
                             
+                            // zsergey: Открытие зумнутой сториз.
                             controller.openStories(peerId: peerId)
                         }
                     }
@@ -2504,6 +2505,7 @@ final class ChatListControllerNode: ASDisplayNode, UIGestureRecognizerDelegate {
                             if let currentOverscrollItemExpansionTimestamp = self.currentOverscrollItemExpansionTimestamp, currentOverscrollItemExpansionTimestamp <= timestamp - 0.0 {
                                 self.allowOverscrollItemExpansion = false
                                 
+                                // zsergey
                                 if isPrimary {
                                     /// TODO?
                                     //self.mainContainerNode.currentItemNode.revealScrollHiddenItem()

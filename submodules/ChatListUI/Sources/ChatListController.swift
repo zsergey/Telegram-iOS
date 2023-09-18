@@ -1906,8 +1906,8 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                     self.chatListDisplayNode.temporaryContentOffsetChangeTransition = transition
                     self.requestLayout(transition: transition)
                     self.chatListDisplayNode.temporaryContentOffsetChangeTransition = nil
-                    
-                    if !shouldDisplayStoriesInChatListHeader(storySubscriptions: rawStorySubscriptions, isHidden: self.location == .chatList(groupId: .archive)) {
+        
+                    if !shouldDisplayStoriesInChatListHeader(storySubscriptions: rawStorySubscriptions, isHidden: self.location == .chatList(groupId: .archive)) && !PullToArchiveSettings.isScrollingUnderPullToArchive {
                         self.chatListDisplayNode.scrollToTopIfStoriesAreExpanded()
                     }
                     
@@ -5842,7 +5842,7 @@ private final class ChatListLocationContext {
                     parentController.updatedPresentationData.1,
                     storyPostingAvailable
                 ).start(next: { [weak self] networkState, proxy, passcode, stateAndFilterId, isReorderingTabs, peerStatus, presentationData, storyPostingAvailable in
-                    guard let self else {
+                    guard let self, !PullToArchiveSettings.isScrollingUnderPullToArchive else {
                         return
                     }
                     
@@ -6280,8 +6280,18 @@ private final class ChatListLocationContext {
             self.didSetReady = true
             self.ready.set(.single(true))
         }
-        
-        self.parentController?.requestLayout(transition: .animated(duration: 0.45, curve: .spring))
+
+        // zsergey: Добавил такую штуку чтобы не трясло таблицу в конце анимации.
+        if !PullToArchiveSettings.isScrollingUnderPullToArchive {
+            // self.parentController?.requestLayout(transition: .animated(duration: 0.45, curve: .spring))
+            let transition: ContainedViewLayoutTransition
+            if PullToArchiveSettings.isRefreshing {
+                transition = .immediate
+            } else {
+                transition = .animated(duration: 0.45, curve: .spring)
+            }
+            self.parentController?.requestLayout(transition: transition)
+        }
         
         Queue.mainQueue().after(1.0, { [weak self] in
             guard let self else {

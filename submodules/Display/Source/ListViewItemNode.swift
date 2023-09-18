@@ -15,15 +15,64 @@ var testSpringFreeResistance: CGFloat = 0.676197171211243
 var testSpringResistanceScrollingLimits: (CGFloat, CGFloat) = (0.1, 1.0)
 var testSpringScrollingResistance: CGFloat = 0.6721
 
-/// I had to use the singleton to finish my contest task in the deadline.
-/// Usally I don't use this pattern and even have forgotten that it exists.
-public class GlobalPullToArchiveState {
-    public static let shared = GlobalPullToArchiveState()
+public protocol PullToArchiveObserverProtocol {
     
-    public weak var scrollView: UIScrollView?
-    public var isDraggingEndedInReleaseState: Bool = false
-    public var isScrollingUnderPullToArchive: Bool = false
-    public var cellHeight: CGFloat = 104
+    func archivedChatsHidden(_ isHidden: Bool, node: ASDisplayNode)
+    func orientationChanged()
+}
+
+public class PullToArchiveSettings {
+
+    private static var observers: [PullToArchiveObserverProtocol] = []
+
+    private static var _scrollViewWidth: CGFloat = 0
+    public static var scrollViewWidth: CGFloat = 0 {
+        didSet {
+            if _scrollViewWidth != 0 && _scrollViewWidth != scrollViewWidth {
+                orientationChanged()
+            }
+            _scrollViewWidth = scrollViewWidth
+        }
+    }
+    public static var hiddenByDefault: Bool = false
+    public static var avatarScale: CGFloat = 1.0
+    public static var isRefreshing: Bool = false
+    public static var cellHeight: CGFloat = 0
+    public static var avatarDiameter: CGFloat = 0
+    public static var isDraggingEndedInReleaseState: Bool = false
+    public static var isScrollingUnderPullToArchive: Bool = false {
+        didSet {
+            print("isScrollingUnderPullToArchive = \(isScrollingUnderPullToArchive)")
+        }
+    }
+    public static var areArchivedChatsHidden: Bool =  true
+
+    // Нужно управлять вьюшкой из другого места.
+    public static var hasTabs: Bool = false
+    public static var isGoingToUp: Bool = false
+    public static var rawOffset: CGFloat = 0
+    public static var lastPosition: CGPoint = .zero
+    public static weak var pullToArchiveView: UIView?
+
+    public static func addObserver(_ observer: PullToArchiveObserverProtocol) {
+        PullToArchiveSettings.observers.append(observer)
+    }
+    
+    public static func archivedChatsHidden(_ isHidden: Bool, node: ASDisplayNode) {
+        
+        PullToArchiveSettings.areArchivedChatsHidden = isHidden
+                
+        PullToArchiveSettings.observers.forEach { observer in
+            observer.archivedChatsHidden(isHidden, node: node)
+        }
+    }
+    
+    public static func orientationChanged() {
+        
+        PullToArchiveSettings.observers.forEach { observer in
+            observer.orientationChanged()
+        }
+    }
 }
 
 struct ListViewItemSpring {
@@ -102,7 +151,8 @@ open class ListViewItemNode: ASDisplayNode, AccessibilityFocusableNode {
     public internal(set) final var index: Int?
     
     public var isHighlightedInOverlay: Bool = false
-    
+    public var isArchive: Bool = false
+     
     public private(set) var accessoryItemNode: ListViewAccessoryItemNode?
 
     func setAccessoryItemNode(_ accessoryItemNode: ListViewAccessoryItemNode?, leftInset: CGFloat, rightInset: CGFloat) {
@@ -198,9 +248,6 @@ open class ListViewItemNode: ASDisplayNode, AccessibilityFocusableNode {
             let effectiveInsets = self.insets
             let height = value.height + effectiveInsets.top + effectiveInsets.bottom
             self.frame = CGRect(origin: self.frame.origin, size: CGSize(width: value.width, height: height))
-            if height != 0 {
-                GlobalPullToArchiveState.shared.cellHeight = height
-            }
         }
     }
     
@@ -262,7 +309,6 @@ open class ListViewItemNode: ASDisplayNode, AccessibilityFocusableNode {
             return CGRect(origin: CGPoint(x: self._position.x - self._bounds.width / 2.0, y: self._position.y - self._bounds.height / 2.0), size: self._bounds.size)
         } set(value) {
             let previousSize = self._bounds.size
-            
             super.frame = value
             self._bounds.size = value.size
             self._position = CGPoint(x: value.midX, y: value.midY)
