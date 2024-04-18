@@ -147,11 +147,12 @@ namespace AS {
           success = _recursive.try_lock();
           break;
         case Unfair:
-#if AS_USE_OS_LOCK
+//#if
+              
           success = os_unfair_lock_trylock(&_unfair);
-#else
-          success = OSSpinLockTry(&_unfair);
-#endif
+//#else
+//          success = OSSpinLockTry(&_unfair);
+//#endif
           break;
         case RecursiveUnfair:
           success = ASRecursiveUnfairLockTryLock(&_runfair);

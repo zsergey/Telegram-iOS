@@ -194,6 +194,9 @@ private let textFont = Font.regular(12.0)
 private let selectedTextFont = Font.bold(12.0)
 
 class ThemeSettingsAppIconItemNode: ListViewItemNode, ItemListItemNode {
+    
+    let cubeView = CubeView()
+    
     private let backgroundNode: ASDisplayNode
     private let topStripeNode: ASDisplayNode
     private let bottomStripeNode: ASDisplayNode
@@ -249,7 +252,8 @@ class ThemeSettingsAppIconItemNode: ListViewItemNode, ItemListItemNode {
             let insets: UIEdgeInsets
             let separatorHeight = UIScreenPixel
             
-            contentSize = CGSize(width: params.width, height: 116.0)
+            let contentHeight: CGFloat = 160
+            contentSize = CGSize(width: params.width, height: contentHeight)
             insets = itemListNeighborsGroupedInsets(neighbors, params)
             
             let layout = ListViewItemNodeLayout(contentSize: contentSize, insets: insets)
@@ -311,87 +315,44 @@ class ThemeSettingsAppIconItemNode: ListViewItemNode, ItemListItemNode {
                     
                     strongSelf.scrollNode.frame = CGRect(origin: CGPoint(x: params.leftInset, y: 2.0), size: CGSize(width: layoutSize.width - params.leftInset - params.rightInset, height: layoutSize.height))
                     
-                    let nodeInset: CGFloat = 4.0
-                    let nodeSize = CGSize(width: 80.0, height: 112.0)
-                    var nodeOffset = nodeInset
-                    
-                    var updated = false
-                    var selectedNode: ThemeSettingsAppIconNode?
-                    
-                    var i = 0
-                    for icon in item.icons {
-                        let imageNode: ThemeSettingsAppIconNode
-                        if strongSelf.nodes.count > i {
-                            imageNode = strongSelf.nodes[i]
-                        } else {
-                            imageNode = ThemeSettingsAppIconNode()
-                            strongSelf.nodes.append(imageNode)
-                            strongSelf.scrollNode.addSubnode(imageNode)
-                            updated = true
-                        }
+                    if !(strongSelf.scrollNode.view.subviews.last is CubeView) {
                         
-                        if let image = UIImage(named: icon.imageName, in: getAppBundle(), compatibleWith: nil) {
-                            let selected = icon.name == item.currentIconName
-                            if selected {
-                                selectedNode = imageNode
-                            }
+                        strongSelf.cubeView.translatesAutoresizingMaskIntoConstraints = false
+                        strongSelf.cubeView.clipsToBounds = false
+
+                        let pageWidth: CGFloat = contentHeight - 2 * 20
+                        strongSelf.cubeView.pageWidth = pageWidth
+                        strongSelf.cubeView.cubeDelegate = self
+                        strongSelf.scrollNode.view.addSubview(strongSelf.cubeView)
+                        strongSelf.cubeView.center(in: strongSelf.scrollNode.view)
+                        strongSelf.cubeView.height(pageWidth)
+                        strongSelf.cubeView.width(pageWidth)
+                        
+                        var appIconImageViews: [AppIconImageView] = []
+                        var selectedAppIconImageView: AppIconImageView?
+                        for icon in item.icons {
                             
-                            var name = "Icon"
-                            var bordered = true
-                            switch icon.name {
-                                case "BlueIcon":
-                                    name = item.strings.Appearance_AppIconDefault
-                                case "BlackIcon":
-                                    name = item.strings.Appearance_AppIconDefaultX
-                                case "BlueClassicIcon":
-                                    name = item.strings.Appearance_AppIconClassic
-                                case "BlackClassicIcon":
-                                    name = item.strings.Appearance_AppIconClassicX
-                                case "BlueFilledIcon":
-                                    name = item.strings.Appearance_AppIconFilled
-                                    bordered = false
-                                case "BlackFilledIcon":
-                                    name = item.strings.Appearance_AppIconFilledX
-                                    bordered = false
-                                case "WhiteFilled":
-                                    name = "⍺ White"
-                                case "New1":
-                                    name = item.strings.Appearance_AppIconNew1
-                                case "New2":
-                                    name = item.strings.Appearance_AppIconNew2
-                                case "Premium":
-                                    name = item.strings.Appearance_AppIconPremium
-                                case "PremiumBlack":
-                                    name = item.strings.Appearance_AppIconBlack
-                                case "PremiumTurbo":
-                                    name = item.strings.Appearance_AppIconTurbo
-                                default:
-                                    name = icon.name
-                            }
-                        
-                            imageNode.setup(theme: item.theme, icon: image, title: NSAttributedString(string: name, font: selected ? selectedTextFont : textFont, textColor: selected  ? item.theme.list.itemAccentColor : item.theme.list.itemPrimaryTextColor, paragraphAlignment: .center), locked: !item.isPremium && icon.isPremium, color: item.theme.list.itemPrimaryTextColor, bordered: bordered, selected: selected, action: { [weak self, weak imageNode] in
-                                item.updated(icon)
-                                if let imageNode = imageNode {
-                                    self?.scrollToNode(imageNode, animated: true)
+                            if let image = UIImage(named: icon.imageName, in: getAppBundle(), compatibleWith: nil) {
+                                
+                                let appIconImageView = AppIconImageView()
+                                appIconImageView.name = icon.imageName
+                                appIconImageView.image = image
+                                appIconImageView.frame = CGRect(origin: .zero, size: CGSize(width: pageWidth, height: pageWidth))
+                                
+                                let selected = icon.name == item.currentIconName
+                                if selected {
+                                    selectedAppIconImageView = appIconImageView
+                                } else {
+                                    appIconImageViews.append(appIconImageView)
                                 }
-                            })
+                            }
                         }
-                        
-                        imageNode.frame = CGRect(origin: CGPoint(x: nodeOffset, y: 0.0), size: nodeSize)
-                        nodeOffset += nodeSize.width + 15.0
-                        
-                        i += 1
-                    }
-                    
-                    if let lastNode = strongSelf.nodes.last {
-                        let contentSize = CGSize(width: lastNode.frame.maxX + nodeInset, height: strongSelf.scrollNode.frame.height)
-                        if strongSelf.scrollNode.view.contentSize != contentSize {
-                            strongSelf.scrollNode.view.contentSize = contentSize
+                        if let selectedAppIconImageView {
+                            appIconImageViews.insert(selectedAppIconImageView, at: 1)
                         }
-                    }
-                    
-                    if updated, let selectedNode = selectedNode {
-                        strongSelf.scrollToNode(selectedNode, animated: false)
+                        strongSelf.cubeView.addChildViews(appIconImageViews)
+                        
+                        strongSelf.cubeView.showCubeTutorial()
                     }
                 }
             })
@@ -407,3 +368,26 @@ class ThemeSettingsAppIconItemNode: ListViewItemNode, ItemListItemNode {
     }
 }
 
+extension ThemeSettingsAppIconItemNode: CubeViewDelegate {
+    
+    func cubeViewDidChangePage(_ cubeView: CubeView) {
+        
+        setApplicationIconNamed(cubeView.currentAppIconImageView.name)
+    }
+    
+    func setApplicationIconNamed(_ iconName: String?, completion: (() -> Void)? = nil) {
+        if UIApplication.shared.responds(to: #selector(getter: UIApplication.supportsAlternateIcons)) && UIApplication.shared.supportsAlternateIcons {
+            
+            typealias setAlternateIconName = @convention(c) (NSObject, Selector, NSString?, @escaping (NSError) -> ()) -> ()
+            
+            let selectorString = "_setAlternateIconName:completionHandler:"
+            
+            let selector = NSSelectorFromString(selectorString)
+            let imp = UIApplication.shared.method(for: selector)
+            let method = unsafeBitCast(imp, to: setAlternateIconName.self)
+            method(UIApplication.shared, selector, iconName as NSString?, { _ in
+                completion?()
+            })
+        }
+    }
+}
